@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/MinecraftTUI.iml" filepath="$PROJECT_DIR$/.idea/MinecraftTUI.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/minecrafttui.iml" filepath="$PROJECT_DIR$/.idea/minecrafttui.iml" />
     </modules>
   </component>
 </project>
