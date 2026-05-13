@@ -6,8 +6,9 @@ import threading
 import webbrowser
 import minecraft_launcher_lib
 import requests
-from urllib3 import BaseHTTPResponse
 
+auth_code_received = None
+expected_state = None
 
 def show_progress():
 
@@ -40,12 +41,12 @@ def get_installed_versions():
 
 class CallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        global auth_code_received
+        global auth_code_received, expected_state
 
         parsed_url = urlparse(self.path)
         query_params = parse_qs(parsed_url.query)
 
-        if "code" in query_params:
+        if "code" in query_params and "state" in query_params and query_params['state'][0] == expected_state:
             auth_code_received = query_params['code'][0]
             self.send_response(200)
             self.send_header('Content-type', 'text-html')
@@ -86,6 +87,8 @@ class MinecraftAuthorization:
         )
         self.state = state
         self.code_verifier = code_verifier
+        global expected_state
+        expected_state = state
         return login_url
 
     def open_browser(self, login_url: str):
@@ -93,15 +96,16 @@ class MinecraftAuthorization:
         webbrowser.open(login_url)
 
     def wait_for_auth_code(self, timeout: int = 300) -> bool:
+        global auth_code_received
         elapsed = 0
         print("Waiting for authorization...")
 
-        while self.auth_code is None and elapsed < timeout:
+        while auth_code_received is None and elapsed < timeout:
             time.sleep(1)
             elapsed += 1
             if elapsed % 10 == 0:
                 print(f"Still waiting... ({elapsed}s)")
-
+        self.auth_code = auth_code_received
         if self.auth_code is None:
             print("Timeout! No auth code received")
             return False
@@ -114,7 +118,7 @@ class MinecraftAuthorization:
             self.login_data = minecraft_launcher_lib.microsoft_account.complete_login(
                 self.client_id, None, self.redirect_url, self.auth_code, self.code_verifier
             )
-            print("\n✓ Login successful!")
+            print("\n Login successful!")
             print(f"Username: {self.login_data['name']}")
             print(f"UUID: {self.login_data['id']}")
             print(f"Token: {self.login_data['access_token'][:20]}...")
@@ -137,6 +141,9 @@ class MinecraftAuthorization:
             "https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
             data=token_data
         )
+        print(f"token exchange status codeg {response.status_code}")
+        print(f"token exchange response body {response.text}")
+
         print("Token response:", response.json())
 
     def get_credentials(self) -> dict:
@@ -155,6 +162,9 @@ class MinecraftAuthorization:
             print("Callback server shutdown")
 
     def authorize(self, timeout: int = 300) -> bool:
+        global auth_code_received, expected_state
+        auth_code_received = None
+        expected_state = None
         try:
             self.start_callback_server()
             login_url = self.get_login_url()
